@@ -1,5 +1,6 @@
 mod kdc;
 mod helpers;
+mod crypto;
 
 #[cfg(test)]
 mod tests {
