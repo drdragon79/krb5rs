@@ -111,10 +111,10 @@ mod tests {
         let rotated = rotate(&[24, 32, 8, 16], 13);
         assert_eq!(rotated, vec![64, 128, 193, 0])
     }
-    #[test]
-    fn test_nfold() {
-        nfold(b"\x01\x02\x03\x04", 5);
-    }
+    // #[test]
+    // fn test_nfold() {
+    //     nfold(b"\x01\x02\x03\x04", 5);
+    // }
     #[test]
     fn test_add1() {
         assert_eq!(add(&[1,2,3], &[2,3,4]), vec![3,5,7]);

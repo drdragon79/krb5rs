@@ -1,12 +1,13 @@
-mod kdc;
-mod helpers;
-mod crypto;
+pub mod kdc;
+pub mod helpers;
+pub mod crypto;
+pub mod builder;
+pub mod messages;
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[test]
-    fn test_connection() {
+    fn test_preauth() {
     }
 }
