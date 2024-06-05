@@ -8,16 +8,13 @@ use std::time::Duration;
 use std::io::{self, Read, Write};
 use log::*;
 
-use crate::helpers;
-
 pub struct Kdc {
     ip_addr: SocketAddr,
-    realm: Option<String>
+    pub realm: String
 }
 
 impl Kdc {
-    pub fn new(ip_addr: SocketAddr, realm: Option<String>) -> Self {
-        let realm = realm.or_else(|| helpers::get_adr_from_realm(ip_addr).ok());
+    pub fn new(ip_addr: SocketAddr, realm: String) -> Self {
         Self {
             ip_addr,
             realm
@@ -40,9 +37,9 @@ impl Kdc {
 
         let mut res_len_be = [11u8; 4];
         dc_socket.read_exact(&mut res_len_be)?;
-        println!("{:?}", res_len_be);
+        debug!("{:?}", res_len_be);
         let res_len = u32::from_be_bytes(res_len_be);
-        println!("{:?}", res_len);
+        debug!("TALK_TCP>res_len: {:?}", res_len);
         let mut res = vec![0; res_len as usize];
         dc_socket.read_exact(&mut res)?;
         Ok(res)

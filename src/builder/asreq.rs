@@ -1,4 +1,4 @@
-use krb5asn1::{
+use crate::asn1::{
     constants::{
         pa::*,
         encryption::*,
@@ -9,10 +9,12 @@ use krb5asn1::{
     helpers::*
 };
 use chrono::prelude::*;
+use std::time::Duration;
 use rand::prelude::*;
 
 
 pub fn asreq(username: KerberosString, realm: Realm, password: Option<KerberosString>) -> AsReq {
+    let time = Utc::now().with_nanosecond(0).unwrap() + Duration::from_secs(86400);
     let mut padata = vec![
         PaData::new(
             PA_PAC_REQUEST,
@@ -56,9 +58,9 @@ pub fn asreq(username: KerberosString, realm: Realm, password: Option<KerberosSt
                 )
             ),
             None,
-            Utc::now().into(),
+            time.into(),
             Some(
-                Utc::now().into()
+                time.into()
             ),
             thread_rng().gen_range(0..u16::MAX).into(),
             vec![

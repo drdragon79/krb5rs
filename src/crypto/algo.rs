@@ -1,3 +1,34 @@
+pub fn xor(message: &[u8], key: &[u8]) -> Vec<u8> {
+    message
+        .iter()
+        .enumerate()
+        .map(|(x, y)| {
+            *y ^ key[x % key.len()]
+        })
+        .collect::<Vec<u8>>()
+}
+
+pub fn to_cts(ct: &[u8], pt_len: usize, blocksize: usize) -> Vec<u8> {
+    if pt_len > blocksize {
+        let initialblock = ..(ct.len() - blocksize*2);
+        let secondlastblock = (ct.len() - blocksize*2)..(ct.len() - blocksize);
+        let lastblock = (ct.len() - blocksize)..;
+        let mut cts_ct = ct[initialblock].to_vec();
+        cts_ct.append(&mut ct[lastblock].to_vec());
+        cts_ct.append(&mut ct[secondlastblock].to_vec());
+        cts_ct[..pt_len].to_vec()
+    } else {
+        ct.to_vec()
+    }
+}
+
+pub fn zeropad(vec: &[u8], pval: usize) -> Vec<u8> {
+    let mut vec = vec.to_vec();
+    let padlenght = (pval - (vec.len() % pval)) % pval;
+    vec.append(&mut vec![0u8; padlenght]);
+    vec
+}
+
 pub fn nfold(bytes: &[u8], n: usize) -> Vec<u8> {
     let mut storage: Vec<u8> = Vec::new();
     let lcm = lcm(n, bytes.len());
@@ -56,14 +87,14 @@ fn add(one: &[u8], two: &[u8]) -> Vec<u8> {
         .any(|x| {
             *x & !0xff != 0
         }) {
-            sum = (0..n)
-                .map(|i| {
-                    ((sum[(i + 1) % n] >> 8) + (sum[i] & 0xff)) as u16
-                })
-                .collect();
-        }
-    sum.
-        iter()
+        sum = (0..n)
+            .map(|i| {
+                ((sum[(i + 1) % n] >> 8) + (sum[i] & 0xff)) as u16
+            })
+            .collect();
+    }
+    sum
+        .iter()
         .map(|x| *x as u8)
         .collect()
 }
@@ -174,5 +205,20 @@ mod tests {
         let res = nfold(b"ba", 168/8);
         let res = hex::encode(&res);
         assert_eq!(res, String::from("fb25d531ae8974499f52fd92ea9857c4ba24cf297e"));
+    }
+    #[test]
+    fn test_pad1() {
+        let padded = zeropad(&[1,2,3], 5);
+        assert_eq!(padded, vec![1,2,3,0,0]);
+    }
+    #[test]
+    fn test_pad2() {
+        let padded = zeropad(&[1,2,3,4,5], 5);
+        assert_eq!(padded, vec![1,2,3,4,5]);
+    }
+    #[test]
+    fn test_pad3() {
+        let padded = zeropad(&[1,2,3,4,5,6], 5);
+        assert_eq!(padded, vec![1,2,3,4,5,6,0,0,0,0]);
     }
 }
