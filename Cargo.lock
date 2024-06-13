@@ -503,10 +503,14 @@ dependencies = [
  "ecb",
  "env_logger",
  "hex",
+ "hmac",
  "log",
+ "md-5",
+ "md4",
  "pbkdf2",
  "rand",
  "rasn",
+ "rc4",
  "sha1",
 ]
 
@@ -521,6 +525,25 @@ name = "log"
 version = "0.4.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "90ed8c1e510134f979dbc4f070f87d4313098b704861a105fe34231c70a3901c"
+
+[[package]]
+name = "md-5"
+version = "0.10.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d89e7ee0cfbedfc4da3340218492196241d89eefb6dab27de5df917a6d2e78cf"
+dependencies = [
+ "cfg-if",
+ "digest",
+]
+
+[[package]]
+name = "md4"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7da5ac363534dce5fabf69949225e174fbf111a498bf0ff794c8ea1fba9f3dda"
+dependencies = [
+ "digest",
+]
 
 [[package]]
 name = "memchr"
@@ -722,6 +745,15 @@ checksum = "1465873a3dfdaa8ae7cb14b4383657caab0b3e8a0aa9ae8e04b044854c8dfce2"
 dependencies = [
  "crossbeam-deque",
  "crossbeam-utils",
+]
+
+[[package]]
+name = "rc4"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0f1256e23efe6097f27aa82d6ca6889361c001586ae0f6917cbad072f05eb275"
+dependencies = [
+ "cipher",
 ]
 
 [[package]]

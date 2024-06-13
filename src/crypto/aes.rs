@@ -2,13 +2,17 @@ use aes::cipher::{BlockDecryptMut, BlockEncryptMut, KeyInit, KeyIvInit, BlockCip
 use cbc::cipher::block_padding::NoPadding as nopadcbc;
 use ecb::cipher::block_padding::NoPadding as nopadecb;
 use sha1::Sha1;
+use hmac::{
+    Hmac,
+    Mac
+};
 use pbkdf2::pbkdf2_hmac;
 use log::*;
 use crate::crypto::{
     nfold,
     zeropad,
-    to_cts,
-    xor
+    xor,
+    gen_random_bytes
 };
 
 #[derive(Debug)]
@@ -29,12 +33,36 @@ impl AES {
         16
     }
 
-    fn from_etype(etype: i32) -> Option<Self> {
-        match etype {
-            17 => Some(AES::AES128),
-            18 => Some(AES::AES256),
-            _ => None
-        }
+    fn macsize(&self) -> usize {
+        12
+    }
+
+    pub fn gen_wk(&self, key: &[u8], keyusage: u8) -> (Vec<u8>, Vec<u8>, Vec<u8>) {
+        // creating well known contant from keyusage for Ki & Ke & Kc
+        let mut ki_usage = (keyusage as u32)
+            .to_be_bytes()
+            .to_vec();
+        ki_usage.push(0x55);
+        debug!("Ki Usage = {}", hex::encode(&ki_usage));
+        let mut ke_usage = (keyusage as u32)
+            .to_be_bytes()
+            .to_vec();
+        ke_usage.push(0xaa);
+        debug!("Ke Usage = {}", hex::encode(&ke_usage));
+        let mut kc_usage = (keyusage as u32)
+            .to_be_bytes()
+            .to_vec();
+        kc_usage.push(0x99);
+        debug!("Kc Usage = {}", hex::encode(&kc_usage));
+
+        // deriving keys Ke & Ki
+        let ki = self.dk(&ki_usage, key);
+        let ke = self.dk(&ke_usage, key);
+        let kc = self.dk(&kc_usage, key);
+        debug!("Ki = {}", hex::encode(&ki));
+        debug!("Ke = {}", hex::encode(&ke));
+        debug!("Kc = {}", hex::encode(&kc));
+        (ki, ke, kc)
     }
 
     pub fn tk(&self, password: &[u8], salt: &[u8], rounds: u32) -> Vec<u8> {
@@ -65,6 +93,51 @@ impl AES {
         dervivedkey
     }
 
+    pub fn encrypt_with_usage(&self, key: &[u8], keyusage: u8, plaintext: &[u8]) -> Vec<u8> {
+        // generate Ki & Ke
+        let (ki, ke, _) = self.gen_wk(key, keyusage);
+
+        // prepare plaintext with random bytes
+        let mut ptext = gen_random_bytes(self.blocksize());
+        debug!("Confounder = {}", hex::encode(&ptext));
+        ptext.append(&mut plaintext.to_vec());
+
+        // generate hmac with Ki
+        let mut hmac = self.gen_hmac(&ptext, &ki);
+
+        // encrypting
+        let mut ct = Vec::new();
+        ct.append(&mut self.encrypt(&ptext, &ke));
+        ct.append(&mut hmac);
+
+        // return Ciphertext
+        debug!("ENCRYPT_WITH_USAGE -> {}", hex::encode(&ct));
+        ct
+    }
+    
+    pub fn decrypt_with_usage(&self, key: &[u8], keyusage: u8, ciphertext: &[u8]) -> Vec<u8> {
+        let (ki, ke, _) = self.gen_wk(key, keyusage);
+
+        // break ciphertext into ciphertext and hmac
+        let ct_len = ciphertext.len();
+        let ct = ciphertext[..(ct_len - self.macsize())].to_vec();
+        let actual_mac = ciphertext[(ct_len - self.macsize())..].to_vec();
+        debug!("Ciphertext = {}", hex::encode(&ct));
+        debug!("Actual HMAC = {}", hex::encode(&actual_mac));
+        
+        // decrypt ciphertext and calculate mac
+        let pt = self.decrypt(&ct, &ke);
+        let expected_mac = self.gen_hmac(&pt, &ki);
+        debug!("Expected HMAC = {}", hex::encode(&expected_mac));
+        if actual_mac != expected_mac {
+            error!("Cannot verify Mac!");
+            std::process::exit(0);
+        }
+        
+        // remove confounder and return
+        pt[self.blocksize()..].to_vec()
+    }
+
     pub fn encrypt(&self, plaintext: &[u8], key: &[u8]) -> Vec<u8> {
         match self {
             AES::AES128 => encrypt_cts::<aes::Aes128>(plaintext, key, self.blocksize()),
@@ -85,11 +158,23 @@ impl AES {
         let tkey = self.tk(password, salt, rounds);
         self.dk(b"kerberos", &tkey)
     }
+
+    pub fn gen_hmac(&self, bytes: &[u8], key: &[u8]) -> Vec<u8> {
+        type HmacSha1 = Hmac<Sha1>;
+        let mut mac = <HmacSha1 as Mac>
+            ::new_from_slice(key)
+            .unwrap();
+        mac.update(bytes);
+        mac
+            .finalize()
+            .into_bytes()[..self.macsize()]
+            .to_vec()
+    }
 } 
 
 fn decrypt_cts<T>(ciphertext: &[u8], key: &[u8], blocksize: usize) -> Vec<u8> 
 where T: BlockCipher + BlockDecryptMut + KeyInit + Clone {
-    debug!("DECRYPT_CTS <- {:?}|{}|{}", "test", hex::encode(ciphertext), hex::encode(key));
+    debug!("DECRYPT_CTS <- {}|{}", hex::encode(ciphertext), hex::encode(key));
 
     let ct_split = ciphertext
         .chunks(16)
@@ -150,7 +235,7 @@ where T: BlockCipher + BlockDecryptMut + KeyInit + Clone {
 fn encrypt_cts<T>(plaintext: &[u8], key: &[u8], blocksize: usize) -> Vec<u8> 
 where T: BlockCipher + BlockEncryptMut + KeyInit
     {
-    debug!("ENCRYPT_CTS <- {:?}|{}|{}", "test", hex::encode(plaintext), hex::encode(key));
+    debug!("ENCRYPT_CTS <- {}|{}", hex::encode(plaintext), hex::encode(key));
     let original_plaintext_len = plaintext.len();
     let mut padded_plaintext = zeropad(plaintext, blocksize);
 
@@ -175,6 +260,20 @@ where T: BlockCipher + BlockEncryptMut + KeyInit
     );
     debug!("ENCRYPT_CTS -> {}", hex::encode(&cts_ciphertext));
     cts_ciphertext
+}
+
+pub fn to_cts(ct: &[u8], pt_len: usize, blocksize: usize) -> Vec<u8> {
+    if pt_len > blocksize {
+        let initialblock = ..(ct.len() - blocksize*2);
+        let secondlastblock = (ct.len() - blocksize*2)..(ct.len() - blocksize);
+        let lastblock = (ct.len() - blocksize)..;
+        let mut cts_ct = ct[initialblock].to_vec();
+        cts_ct.append(&mut ct[lastblock].to_vec());
+        cts_ct.append(&mut ct[secondlastblock].to_vec());
+        cts_ct[..pt_len].to_vec()
+    } else {
+        ct.to_vec()
+    }
 }
 
 #[cfg(test)]

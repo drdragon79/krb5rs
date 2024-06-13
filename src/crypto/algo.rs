@@ -1,3 +1,14 @@
+use rand::prelude::*;
+
+/// Generate random bytes of "n" length
+pub fn gen_random_bytes(n: usize) -> Vec<u8> {
+    (0..n)
+        .map(|_| {
+            thread_rng().gen_range(0..255) as u8
+        })
+        .collect::<Vec<u8>>()
+}
+
 pub fn xor(message: &[u8], key: &[u8]) -> Vec<u8> {
     message
         .iter()
@@ -8,19 +19,6 @@ pub fn xor(message: &[u8], key: &[u8]) -> Vec<u8> {
         .collect::<Vec<u8>>()
 }
 
-pub fn to_cts(ct: &[u8], pt_len: usize, blocksize: usize) -> Vec<u8> {
-    if pt_len > blocksize {
-        let initialblock = ..(ct.len() - blocksize*2);
-        let secondlastblock = (ct.len() - blocksize*2)..(ct.len() - blocksize);
-        let lastblock = (ct.len() - blocksize)..;
-        let mut cts_ct = ct[initialblock].to_vec();
-        cts_ct.append(&mut ct[lastblock].to_vec());
-        cts_ct.append(&mut ct[secondlastblock].to_vec());
-        cts_ct[..pt_len].to_vec()
-    } else {
-        ct.to_vec()
-    }
-}
 
 pub fn zeropad(vec: &[u8], pval: usize) -> Vec<u8> {
     let mut vec = vec.to_vec();
@@ -142,10 +140,6 @@ mod tests {
         let rotated = rotate(&[24, 32, 8, 16], 13);
         assert_eq!(rotated, vec![64, 128, 193, 0])
     }
-    // #[test]
-    // fn test_nfold() {
-    //     nfold(b"\x01\x02\x03\x04", 5);
-    // }
     #[test]
     fn test_add1() {
         assert_eq!(add(&[1,2,3], &[2,3,4]), vec![3,5,7]);

@@ -93,7 +93,7 @@ pub mod name {
     pub const KRB_NT_ENTERPRISE: i32 =     10;    // Enterprise name; may be mapped to principal name
 }
 
-pub mod krberror {
+pub mod krberrors {
     pub const KDC_ERR_NONE: i32 =                            0;  // No error
     pub const KDC_ERR_NAME_EXP: i32 =                        1;  // Client's entry in database has expired
     pub const KDC_ERR_SERVICE_EXP: i32 =                     2;  // Server's entry in database has expired
